@@ -45,7 +45,7 @@ static ngx_command_t  ngx_rtmp_core_commands[] = {
       NULL },
 
     { ngx_string("listen"),
-      NGX_RTMP_SRV_CONF|NGX_CONF_TAKE12,
+      NGX_RTMP_SRV_CONF|NGX_CONF_1MORE,
       ngx_rtmp_core_listen,
       NGX_RTMP_SRV_CONF_OFFSET,
       0,
@@ -358,12 +358,11 @@ ngx_rtmp_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-#if (nginx_version >= 1009011)
+#if defined(nginx_version) && nginx_version >= 1009011
     modules = cf->cycle->modules;
 #else
     modules = ngx_modules;
 #endif
-
     for (m = 0; modules[m]; m++) {
         if (modules[m]->type != NGX_RTMP_MODULE) {
             continue;
@@ -446,12 +445,11 @@ ngx_rtmp_core_application(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-#if (nginx_version >= 1009011)
+#if defined(nginx_version) && nginx_version >= 1009011
     modules = cf->cycle->modules;
 #else
     modules = ngx_modules;
 #endif
-
     for (i = 0; modules[i]; i++) {
         if (modules[i]->type != NGX_RTMP_MODULE) {
             continue;
@@ -501,8 +499,7 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     in_port_t                   port;
     ngx_str_t                  *value;
     ngx_url_t                   u;
-    ngx_uint_t                  i, m;
-    ngx_module_t              **modules;
+    ngx_uint_t                  i;
     struct sockaddr            *sa;
     ngx_rtmp_listen_t          *ls;
     struct sockaddr_in         *sin;
@@ -559,9 +556,11 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             break;
         }
 
-        if (ngx_memcmp(ls[i].sockaddr + off, (u_char *) &u.sockaddr + off, len)
-            != 0)
-        {
+#if (nginx_version >= 1011000)
+        if (ngx_memcmp(ls[i].sockaddr + off, (u_char *) &u.sockaddr + off, len) != 0) {
+#else
+        if (ngx_memcmp(ls[i].sockaddr + off, u.sockaddr + off, len) != 0) {
+#endif
             continue;
         }
 
@@ -581,23 +580,15 @@ ngx_rtmp_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_memzero(ls, sizeof(ngx_rtmp_listen_t));
 
+#if (nginx_version >= 1011000)
     ngx_memcpy(ls->sockaddr, (u_char *) &u.sockaddr, u.socklen);
+#else
+    ngx_memcpy(ls->sockaddr, u.sockaddr, u.socklen);
+#endif
 
     ls->socklen = u.socklen;
     ls->wildcard = u.wildcard;
     ls->ctx = cf->ctx;
-
-#if (nginx_version >= 1009011)
-    modules = cf->cycle->modules;
-#else
-    modules = ngx_modules;
-#endif
-
-    for (m = 0; modules[m]; m++) {
-        if (modules[m]->type != NGX_RTMP_MODULE) {
-            continue;
-        }
-    }
 
     for (i = 2; i < cf->args->nelts; i++) {
 
